@@ -17,6 +17,6 @@ spec:
       serviceAccountName: github-actions-sa
       containers:
       - name: my-app
-        image: $DOCKER_HUB_USERNAME/my-app:latest
+        image: anmol784/my-app:latest
         ports:
         - containerPort: 8080
