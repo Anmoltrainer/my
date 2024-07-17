@@ -11,3 +11,5 @@ spec:
       port: 80
       targetPort: 8080
       nodePort: 30007
+  # Associate the Service Account with the Service
+  serviceAccountName: github-actions-sa
