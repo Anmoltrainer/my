@@ -1,7 +1,14 @@
-FROM tomcat:8.0
-RUN rm -r /usr/local/tomcat/webapps/*
-ADD ./target/*.war /usr/local/tomcat/webapps/
-EXPOSE 8181
-WORKDIR /usr/local/tomcat/webapps/
-CMD ["catalina.sh","run"]
+# Use an appropriate base image with Java and Tomcat installed
+FROM tomcat:9.0-jre11
 
+# Remove existing ROOT folder to replace it with your application
+RUN rm -rf /usr/local/tomcat/webapps/ROOT
+
+# Copy your artifact (WAR file) to Tomcat webapps directory
+COPY target/*.war /usr/local/tomcat/webapps/ROOT.war
+
+# Expose the default Tomcat port
+EXPOSE 8080
+
+# Start Tomcat when the container launches
+CMD ["catalina.sh", "run"]
