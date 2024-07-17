@@ -4,8 +4,8 @@ FROM tomcat:9.0-jre11
 # Remove existing ROOT folder to replace it with your application
 RUN rm -rf /usr/local/tomcat/webapps/ROOT
 
-# Copy your artifact (WAR file) to Tomcat webapps directory
-COPY target/*.war /usr/local/tomcat/webapps/ROOT.war
+# Copy your artifact (WAR file) to Tomcat webapps directory and rename it to ROOT.war
+COPY onlinebookstore-0.0.1-SNAPSHOT.war /usr/local/tomcat/webapps/ROOT.war
 
 # Expose the default Tomcat port
 EXPOSE 8080
