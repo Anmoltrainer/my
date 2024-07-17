@@ -54,6 +54,11 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
+      
+      - name: Debug AWS configuration
+        run: |
+          aws sts get-caller-identity
+          aws eks list-clusters --region us-east-1
 
       - name: Set up kubectl
         uses: azure/setup-kubectl@v1
@@ -62,8 +67,24 @@ jobs:
 
       - name: Update kubeconfig
         run: |
-          aws eks update-kubeconfig --name demo-cluster --region us-east-1
-          kubectl config set-context --current --namespace=default --user=github-actions-sa
+          aws eks update-kubeconfig --name demo-cluster --region us-east-1 --kubeconfig ./kubeconfig
+          export KUBECONFIG=./kubeconfig
+
+      - name: Debug kubeconfig
+        run: |
+          cat ./kubeconfig
+
+      - name: Debug IAM permissions
+        run: |
+          aws sts get-caller-identity
+          aws eks describe-cluster --name demo-cluster --region us-east-1
+
+      - name: Debug Kubernetes permissions
+        run: |
+          kubectl --kubeconfig ./kubeconfig auth can-i create deployments
+          kubectl --kubeconfig ./kubeconfig auth can-i create services
+          kubectl --kubeconfig ./kubeconfig auth can-i create roles
+          kubectl --kubeconfig ./kubeconfig auth can-i create rolebindings
 
       - name: Update Deployment file
         run: |
@@ -72,12 +93,22 @@ jobs:
 
       - name: Create Kubernetes resources
         run: |
-          kubectl apply -f k8s/Deployment.yaml -n default
-          kubectl apply -f k8s/Service.yaml -n default
+          kubectl --kubeconfig ./kubeconfig apply -f k8s/ServiceAccount.yaml
+          kubectl --kubeconfig ./kubeconfig get events --sort-by=.metadata.creationTimestamp
+          
+          kubectl --kubeconfig ./kubeconfig apply -f k8s/Role.yaml
+          kubectl --kubeconfig ./kubeconfig get events --sort-by=.metadata.creationTimestamp
+          
+          kubectl --kubeconfig ./kubeconfig apply -f k8s/RoleBinding.yaml
+          kubectl --kubeconfig ./kubeconfig get events --sort-by=.metadata.creationTimestamp
+          
+          kubectl --kubeconfig ./kubeconfig apply -f k8s/Deployment.yaml
+          kubectl --kubeconfig ./kubeconfig get events --sort-by=.metadata.creationTimestamp
+          
+          kubectl --kubeconfig ./kubeconfig apply -f k8s/Service.yaml
+          kubectl --kubeconfig ./kubeconfig get events --sort-by=.metadata.creationTimestamp
 
-      - name: Check deployment status
+      - name: Check for errors
         run: |
-          kubectl get deployments -n default
-          kubectl get services -n default
-          kubectl get pods -n default
-          kubectl get events --sort-by=.metadata.creationTimestamp -n default
+          kubectl --kubeconfig ./kubeconfig get all
+          kubectl --kubeconfig ./kubeconfig get events --sort-by=.metadata.creationTimestamp
