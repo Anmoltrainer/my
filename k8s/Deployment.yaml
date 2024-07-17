@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+  labels:
+    app: my-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      serviceAccountName: github-actions-sa
+      containers:
+      - name: my-app
+        image: $DOCKER_HUB_USERNAME/my-app:latest
+        ports:
+        - containerPort: 8080
