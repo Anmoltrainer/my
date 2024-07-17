@@ -2,23 +2,22 @@ name: CI/CD Pipeline
 on:
   push:
     branches:
-      - main  # This workflow runs when code is pushed to the main branch
-
+      - main
 jobs:
   build:
-    runs-on: ubuntu-latest  # Use the latest Ubuntu runner provided by GitHub Actions
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2  # This action checks out your repository code
+        uses: actions/checkout@v2
 
       - name: Set up JDK 11
-        uses: actions/setup-java@v2  # This action sets up Java 11
+        uses: actions/setup-java@v2
         with:
           java-version: '11'
           distribution: 'adopt'
 
       - name: Cache Maven packages
-        uses: actions/cache@v2  # This action caches Maven dependencies to speed up builds
+        uses: actions/cache@v2
         with:
           path: ~/.m2
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
@@ -26,75 +25,59 @@ jobs:
             ${{ runner.os }}-maven-
 
       - name: Build with Maven
-        run: mvn clean package  # This command builds your Java project
+        run: mvn clean package
 
       - name: Write Dockerfile
         run: |
-          echo "FROM tomcat:9.0-jre11" > Dockerfile  # Create a Dockerfile
-          echo "COPY target/*.war /usr/local/tomcat/webapps/" >> Dockerfile  # Add your WAR file to Tomcat webapps
+          echo "FROM tomcat:9.0-jre11" > Dockerfile
+          echo "COPY target/*.war /usr/local/tomcat/webapps/" >> Dockerfile
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2  # This action sets up Docker Buildx for multi-platform builds
+        uses: docker/setup-buildx-action@v2
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v2  # This action logs into Docker Hub
+        uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build and push Docker image
         run: |
-          docker buildx build --platform linux/amd64,linux/arm64 \  # Build for multiple platforms
-            -t ${{ secrets.DOCKER_HUB_USERNAME }}/my-app:${{ github.sha }} \  # Tag with commit SHA
-            -t ${{ secrets.DOCKER_HUB_USERNAME }}/my-app:latest \  # Also tag as latest
-            --push .  # Push the image to Docker Hub
+          docker buildx build --platform linux/amd64,linux/arm64 \
+            -t ${{ secrets.DOCKER_HUB_USERNAME }}/my-app:${{ github.sha }} \
+            -t ${{ secrets.DOCKER_HUB_USERNAME }}/my-app:latest \
+            --push .
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1  # This action sets up AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
       - name: Set up kubectl
-        uses: azure/setup-kubectl@v1  # This action installs kubectl
+        uses: azure/setup-kubectl@v1
         with:
           version: v1.21.0
 
       - name: Update kubeconfig
         run: |
-          aws eks get-token --cluster-name demo-cluster > token.txt  # Get the token and save it to a file
-          aws eks update-kubeconfig --name demo-cluster --region us-east-1  # Update kubeconfig for your cluster
-
-      - name: Apply EKS token
-        run: |
-          kubectl apply -f token.txt  # Apply the token from the file
-
-      - name: Set kubectl context to use ServiceAccount
-        run: |
-          kubectl config view --raw > ~/.kube/config  # Ensure kubeconfig is in the default location
-          kubectl config set-context --current --namespace=default  # Set the namespace
-          kubectl config set-context --current --user=github-actions-sa  # Set the user to your ServiceAccount
-
-      - name: Debug kubectl config
-        run: |
-          kubectl config view
-          kubectl config current-context
-          kubectl cluster-info
+          aws eks update-kubeconfig --name demo-cluster --region us-east-1
+          kubectl config set-context --current --namespace=default --user=github-actions-sa
 
       - name: Update Deployment file
         run: |
-          sed -i 's|$DOCKER_HUB_USERNAME|${{ secrets.DOCKER_HUB_USERNAME }}|g' k8s/Deployment.yaml  # Replace placeholder with actual Docker Hub username
-          sed -i 's|:latest|:${{ github.sha }}|g' k8s/Deployment.yaml  # Update image tag to use commit SHA
+          sed -i 's|$DOCKER_HUB_USERNAME|${{ secrets.DOCKER_HUB_USERNAME }}|g' k8s/Deployment.yaml
+          sed -i 's|:latest|:${{ github.sha }}|g' k8s/Deployment.yaml
 
       - name: Create Kubernetes resources
         run: |
-          kubectl apply -f k8s/Deployment.yaml  # Apply Deployment
-          kubectl apply -f k8s/Service.yaml  # Apply Service
+          kubectl apply -f k8s/Deployment.yaml -n default
+          kubectl apply -f k8s/Service.yaml -n default
 
       - name: Check deployment status
         run: |
-          kubectl get deployments  # List deployments
-          kubectl get services  # List services
-          kubectl get pods  # List pods
-          kubectl get events --sort-by=.metadata.creationTimestamp  # Get recent events
+          kubectl get deployments -n default
+          kubectl get services -n default
+          kubectl get pods -n default
+          kubectl get events --sort-by=.metadata.creationTimestamp -n default
